@@ -980,8 +980,17 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	var usage = &dto.Usage{}
 	var imageCount int
 	responseText := strings.Builder{}
+	
+	// 用于收集完整的流式响应体
+	var fullStreamResponse strings.Builder
 
 	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+		// 累积完整响应体用于日志记录（不影响转发逻辑）
+		if len(data) > 0 {
+			fullStreamResponse.WriteString(data)
+			fullStreamResponse.WriteString("\n")
+		}
+		
 		var geminiResponse dto.GeminiChatResponse
 		err := common.UnmarshalJsonStr(data, &geminiResponse)
 		if err != nil {
@@ -1038,6 +1047,9 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			usage = &dto.Usage{}
 		}
 	}
+
+	// 将完整的流式响应体存储到 relayInfo 中
+	info.ResponseBody = fullStreamResponse.String()
 
 	return usage, nil
 }
@@ -1113,6 +1125,10 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
+	
 	service.CloseResponseBodyGracefully(resp)
 	if common.DebugEnabled {
 		println(string(responseBody))
@@ -1180,6 +1196,9 @@ func GeminiEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	if readErr != nil {
 		return nil, types.NewOpenAIError(readErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
 
 	var geminiResponse dto.GeminiBatchEmbeddingResponse
 	if jsonErr := common.Unmarshal(responseBody, &geminiResponse); jsonErr != nil {
@@ -1218,7 +1237,7 @@ func GeminiEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 		return nil, types.NewOpenAIError(jsonErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
 
-	service.IOCopyBytesGracefully(c, resp, jsonResponse)
+service.IOCopyBytesGracefully(c, resp, jsonResponse)
 	return usage, nil
 }
 
@@ -1227,6 +1246,10 @@ func GeminiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 	if readErr != nil {
 		return nil, types.NewOpenAIError(readErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
+	
 	_ = resp.Body.Close()
 
 	var geminiResponse dto.GeminiImageResponse
@@ -1305,6 +1328,10 @@ func ChatImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	if readErr != nil {
 		return nil, types.NewOpenAIError(readErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
+	
 	service.CloseResponseBodyGracefully(resp)
 
 	if common.DebugEnabled {

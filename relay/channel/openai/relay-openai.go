@@ -126,8 +126,18 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 
 	// 检查是否为音频模型
 	isAudioModel := strings.Contains(strings.ToLower(model), "audio")
+	
+	// 用于收集完整的流式响应体
+	var fullStreamResponse strings.Builder
 
 	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+		// 累积完整响应体用于日志记录（不影响转发逻辑）
+		if len(data) > 0 {
+			fullStreamResponse.WriteString(data)
+			fullStreamResponse.WriteString("\n")
+		}
+		
+		// 原始转发逻辑：延迟一条转发（除了最后一条，在循环结束后单独处理）
 		if lastStreamData != "" {
 			err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent)
 			if err != nil {
@@ -189,6 +199,9 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 
 	applyUsagePostProcessing(info, usage, nil)
 
+	// 将完整的流式响应体存储到 relayInfo 中
+	info.ResponseBody = fullStreamResponse.String()
+
 	HandleFinalResponse(c, info, lastStreamData, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
 
 	return usage, nil
@@ -202,6 +215,10 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
+	
 	if common.DebugEnabled {
 		println("upstream response body:", string(responseBody))
 	}

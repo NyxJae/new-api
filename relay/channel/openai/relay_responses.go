@@ -26,6 +26,10 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
+	
 	err = common.Unmarshal(responseBody, &responsesResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
@@ -78,8 +82,16 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 
 	var usage = &dto.Usage{}
 	var responseTextBuilder strings.Builder
+	
+	// 用于收集完整的流式响应体
+	var fullStreamResponse strings.Builder
 
 	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+		// 累积完整响应体用于日志记录（不影响转发逻辑）
+		if len(data) > 0 {
+			fullStreamResponse.WriteString(data)
+			fullStreamResponse.WriteString("\n")
+		}
 
 		// 检查当前数据是否包含 completed 状态和 usage 信息
 		var streamResponse dto.ResponsesStreamResponse
@@ -129,6 +141,9 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		}
 		return true
 	})
+
+	// 将完整的流式响应体存储到 relayInfo 中
+	info.ResponseBody = fullStreamResponse.String()
 
 	if usage.CompletionTokens == 0 {
 		// 计算输出文本的 token 数量

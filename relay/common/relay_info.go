@@ -114,6 +114,10 @@ type RelayInfo struct {
 
 	Request dto.Request
 
+	// 添加请求体和响应体字段，用于日志记录
+	RequestBody  string `json:"request_body"`
+	ResponseBody string `json:"response_body"`
+
 	ThinkingContentInfo
 	*ClaudeConvertInfo
 	*RerankerInfo

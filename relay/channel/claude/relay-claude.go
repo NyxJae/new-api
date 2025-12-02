@@ -708,8 +708,18 @@ func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.
 		ResponseText: strings.Builder{},
 		Usage:        &dto.Usage{},
 	}
+	
+	// 用于收集完整的流式响应体
+	var fullStreamResponse strings.Builder
+	
 	var err *types.NewAPIError
 	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
+		// 累积完整响应体用于日志记录（不影响转发逻辑）
+		if len(data) > 0 {
+			fullStreamResponse.WriteString(data)
+			fullStreamResponse.WriteString("\n")
+		}
+		
 		err = HandleStreamResponseData(c, info, claudeInfo, data, requestMode)
 		if err != nil {
 			return false
@@ -719,6 +729,9 @@ func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.
 	if err != nil {
 		return nil, err
 	}
+
+	// 将完整的流式响应体存储到 relayInfo 中
+	info.ResponseBody = fullStreamResponse.String()
 
 	HandleStreamFinalResponse(c, info, claudeInfo, requestMode)
 	return claudeInfo.Usage, nil
@@ -782,6 +795,10 @@ func ClaudeHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
+	
 	if common.DebugEnabled {
 		println("responseBody: ", string(responseBody))
 	}

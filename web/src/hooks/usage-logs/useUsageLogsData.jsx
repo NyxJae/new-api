@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@douyinfe/semi-ui';
+import { Modal, TextArea, Button } from '@douyinfe/semi-ui';
 import {
   API,
   getTodayStartTimestamp,
@@ -39,6 +39,137 @@ import {
 } from '../../helpers';
 import { ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
+
+const safeJsonPretty = (str) => {
+  try {
+    const obj = JSON.parse(str);
+    return JSON.stringify(obj, null, 2);
+  } catch (e) {
+    return str;
+  }
+};
+
+const extractContentFromResponse = (rawData) => {
+  if (!rawData) return '';
+
+  // 支持两种格式：1. SSE带data前缀 2. 纯JSON Lines
+  const lines = rawData.split('\n').filter((line) => line.trim());
+  let content = '';
+  let reasoningContent = ''; // 新增：提取推理内容
+  let foundContent = false;
+  let foundReasoning = false;
+
+  for (const line of lines) {
+    let dataStr = line.trim();
+
+    // 跳过SSE结束标记
+    if (dataStr === 'data: [DONE]' || dataStr === '[DONE]') continue;
+
+    // 移除SSE的data:前缀（如果存在）
+    if (dataStr.startsWith('data: ')) {
+      dataStr = dataStr.substring(6);
+    }
+
+    // 跳过空行
+    if (!dataStr) continue;
+
+    try {
+      const data = JSON.parse(dataStr);
+
+      // 标准OpenAI格式
+      if (data.choices?.[0]?.delta) {
+        const delta = data.choices[0].delta;
+
+        // 提取content
+        if (delta.content !== undefined && delta.content !== '') {
+          content += delta.content;
+          foundContent = true;
+        }
+
+        // 提取reasoning_content（新增）
+        if (
+          delta.reasoning_content !== undefined &&
+          delta.reasoning_content !== ''
+        ) {
+          reasoningContent += delta.reasoning_content;
+          foundReasoning = true;
+        }
+      }
+    } catch (e) {
+      // 解析失败则忽略该行
+      console.warn('Failed to parse stream line:', dataStr, e);
+    }
+  }
+
+  // 组合内容和推理（如果需要同时显示）
+  if (foundContent || foundReasoning) {
+    // 可以根据需求决定如何组合，这里选择分别展示
+    if (foundReasoning && reasoningContent) {
+      return `【推理过程】\n${reasoningContent}\n\n【回复内容】\n${content}`;
+    }
+    return content;
+  }
+
+  return safeJsonPretty(rawData);
+};
+
+const RequestResponseDisplay = ({ content, type, rawData, isStream }) => {
+  const { t } = useTranslation();
+
+  // 对于响应内容，只提取 content 字段的文本进行显示
+  const displayContent =
+    type === 'response'
+      ? extractContentFromResponse(content, isStream)
+      : safeJsonPretty(content);
+
+  const handleCopy = async () => {
+    if (await copy(displayContent)) {
+      showSuccess(t('已复制'));
+    } else {
+      showError(t('复制失败'));
+    }
+  };
+
+  const handleCopyRaw = async () => {
+    if (await copy(rawData)) {
+      showSuccess(t('已复制原始回复内容'));
+    } else {
+      showError(t('复制失败'));
+    }
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 5,
+          marginBottom: 5,
+          justifyContent: 'flex-end',
+        }}
+      >
+        <Button theme='solid' type='tertiary' size='small' onClick={handleCopy}>
+          {t('复制')}
+        </Button>
+        {type === 'response' && rawData && displayContent !== rawData && (
+          <Button
+            theme='solid'
+            type='tertiary'
+            size='small'
+            onClick={handleCopyRaw}
+          >
+            {t('复制原始回复内容')}
+          </Button>
+        )}
+      </div>
+      <TextArea
+        value={displayContent}
+        autosize={{ minRows: 1, maxRows: 15 }}
+        style={{ width: '100%', fontFamily: 'monospace' }}
+      />
+    </div>
+  );
+};
 
 export const useLogsData = () => {
   const { t } = useTranslation();
@@ -362,9 +493,13 @@ export const useLogsData = () => {
                 other.cache_ratio || 1.0,
                 other.cache_creation_ratio || 1.0,
                 other.cache_creation_tokens_5m || 0,
-                other.cache_creation_ratio_5m || other.cache_creation_ratio || 1.0,
+                other.cache_creation_ratio_5m ||
+                  other.cache_creation_ratio ||
+                  1.0,
                 other.cache_creation_tokens_1h || 0,
-                other.cache_creation_ratio_1h || other.cache_creation_ratio || 1.0,
+                other.cache_creation_ratio_1h ||
+                  other.cache_creation_ratio ||
+                  1.0
               )
             : renderLogContent(
                 other?.model_ratio,
@@ -378,7 +513,7 @@ export const useLogsData = () => {
                 other.web_search || false,
                 other.web_search_call_count || 0,
                 other.file_search || false,
-                other.file_search_call_count || 0,
+                other.file_search_call_count || 0
               ),
         });
         if (logs[i]?.content) {
@@ -418,7 +553,7 @@ export const useLogsData = () => {
             other?.group_ratio,
             other?.user_group_ratio,
             other?.cache_tokens || 0,
-            other?.cache_ratio || 1.0,
+            other?.cache_ratio || 1.0
           );
         } else if (other?.claude) {
           content = renderClaudeModelPrice(
@@ -436,7 +571,7 @@ export const useLogsData = () => {
             other.cache_creation_tokens_5m || 0,
             other.cache_creation_ratio_5m || other.cache_creation_ratio || 1.0,
             other.cache_creation_tokens_1h || 0,
-            other.cache_creation_ratio_1h || other.cache_creation_ratio || 1.0,
+            other.cache_creation_ratio_1h || other.cache_creation_ratio || 1.0
           );
         } else {
           content = renderModelPrice(
@@ -462,7 +597,7 @@ export const useLogsData = () => {
             other?.audio_input_token_count || 0,
             other?.audio_input_price || 0,
             other?.image_generation_call || false,
-            other?.image_generation_call_price || 0,
+            other?.image_generation_call_price || 0
           );
         }
         expandDataLocal.push({
@@ -482,6 +617,32 @@ export const useLogsData = () => {
           value: other.request_path,
         });
       }
+      // 请求消息和回复内容显示
+      if (other?.request_body) {
+        expandDataLocal.push({
+          key: t('请求消息'),
+          value: (
+            <RequestResponseDisplay
+              content={other.request_body}
+              type='request'
+              rawData={other.request_body}
+            />
+          ),
+        });
+      }
+      if (other?.response_body) {
+        expandDataLocal.push({
+          key: t('回复内容'),
+          value: (
+            <RequestResponseDisplay
+              content={other.response_body}
+              type='response'
+              rawData={other.response_body}
+              isStream={other?.isStream || false}
+            />
+          ),
+        });
+      }
       if (isAdminUser) {
         let localCountMode = '';
         if (other?.admin_info?.local_count_tokens) {
@@ -490,8 +651,8 @@ export const useLogsData = () => {
           localCountMode = t('上游返回');
         }
         expandDataLocal.push({
-            key: t('计费模式'),
-            value: localCountMode,
+          key: t('计费模式'),
+          value: localCountMode,
         });
       }
       expandDatesLocal[logs[i].key] = expandDataLocal;
@@ -521,8 +682,8 @@ export const useLogsData = () => {
       customLogType !== null
         ? customLogType
         : formLogType !== undefined
-          ? formLogType
-          : logType;
+        ? formLogType
+        : logType;
 
     let localStartTimestamp = Date.parse(start_timestamp) / 1000;
     let localEndTimestamp = Date.parse(end_timestamp) / 1000;
@@ -603,7 +764,7 @@ export const useLogsData = () => {
   // Check if any record has expandable content
   const hasExpandableRows = () => {
     return logs.some(
-      (log) => expandData[log.key] && expandData[log.key].length > 0,
+      (log) => expandData[log.key] && expandData[log.key].length > 0
     );
   };
 

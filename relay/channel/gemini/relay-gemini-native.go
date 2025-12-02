@@ -24,6 +24,9 @@ func GeminiTextGenerationHandler(c *gin.Context, info *relaycommon.RelayInfo, re
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
 
 	if common.DebugEnabled {
 		println(string(responseBody))
@@ -65,6 +68,9 @@ func NativeGeminiEmbeddingHandler(c *gin.Context, resp *http.Response, info *rel
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+	
+	// 将响应体存储到 relayInfo 中
+	info.ResponseBody = string(responseBody)
 
 	if common.DebugEnabled {
 		println(string(responseBody))

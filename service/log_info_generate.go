@@ -55,6 +55,14 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 		other["is_system_prompt_overwritten"] = true
 	}
 
+	// 添加请求体和响应体到日志中
+	if relayInfo.RequestBody != "" {
+		other["request_body"] = relayInfo.RequestBody
+	}
+	if relayInfo.ResponseBody != "" {
+		other["response_body"] = relayInfo.ResponseBody
+	}
+
 	adminInfo := make(map[string]interface{})
 	adminInfo["use_channel"] = ctx.GetStringSlice("use_channel")
 	isMultiKey := common.GetContextKeyBool(ctx, constant.ContextKeyChannelIsMultiKey)

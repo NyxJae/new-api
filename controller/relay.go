@@ -165,9 +165,12 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			break
 		}
 
-		addUsedChannel(c, channel.Id)
+addUsedChannel(c, channel.Id)
 		requestBody, _ := common.GetRequestBody(c)
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+
+		// 将请求体存储到 relayInfo 中
+		relayInfo.RequestBody = string(requestBody)
 
 		switch relayFormat {
 		case types.RelayFormatOpenAIRealtime:
