@@ -84,7 +84,9 @@ export function getLucideIcon(key, selected = false) {
   const commonProps = {
     size,
     strokeWidth,
-    className: `transition-colors duration-200 ${selected ? 'transition-transform duration-200 scale-105' : ''}`,
+    className: `transition-colors duration-200 ${
+      selected ? 'transition-transform duration-200 scale-105' : ''
+    }`,
   };
 
   // 根据不同的key返回不同的图标
@@ -164,21 +166,21 @@ export const getModelCategories = (() => {
       gemini: {
         label: 'Gemini',
         icon: <Gemini.Color />,
-        filter: (model) => 
-          model.model_name.toLowerCase().includes('gemini') || 
+        filter: (model) =>
+          model.model_name.toLowerCase().includes('gemini') ||
           model.model_name.toLowerCase().includes('gemma') ||
-          model.model_name.toLowerCase().includes('learnlm') || 
+          model.model_name.toLowerCase().includes('learnlm') ||
           model.model_name.toLowerCase().startsWith('embedding-') ||
           model.model_name.toLowerCase().includes('text-embedding-004') ||
-          model.model_name.toLowerCase().includes('imagen-4') || 
-          model.model_name.toLowerCase().includes('veo-') || 
-          model.model_name.toLowerCase().includes('aqa') ,
+          model.model_name.toLowerCase().includes('imagen-4') ||
+          model.model_name.toLowerCase().includes('veo-') ||
+          model.model_name.toLowerCase().includes('aqa'),
       },
       moonshot: {
         label: 'Moonshot',
         icon: <Moonshot />,
-        filter: (model) => 
-          model.model_name.toLowerCase().includes('moonshot') || 
+        filter: (model) =>
+          model.model_name.toLowerCase().includes('moonshot') ||
           model.model_name.toLowerCase().includes('kimi'),
       },
       zhipu: {
@@ -186,8 +188,8 @@ export const getModelCategories = (() => {
         icon: <Zhipu.Color />,
         filter: (model) =>
           model.model_name.toLowerCase().includes('chatglm') ||
-          model.model_name.toLowerCase().includes('glm-') || 
-          model.model_name.toLowerCase().includes('cogview') || 
+          model.model_name.toLowerCase().includes('glm-') ||
+          model.model_name.toLowerCase().includes('cogview') ||
           model.model_name.toLowerCase().includes('cogvideo'),
       },
       qwen: {
@@ -203,8 +205,8 @@ export const getModelCategories = (() => {
       minimax: {
         label: 'MiniMax',
         icon: <Minimax.Color />,
-        filter: (model) => 
-          model.model_name.toLowerCase().includes('abab') || 
+        filter: (model) =>
+          model.model_name.toLowerCase().includes('abab') ||
           model.model_name.toLowerCase().includes('minimax'),
       },
       baidu: {
@@ -230,7 +232,7 @@ export const getModelCategories = (() => {
       cohere: {
         label: 'Cohere',
         icon: <Cohere.Color />,
-        filter: (model) => 
+        filter: (model) =>
           model.model_name.toLowerCase().includes('command') ||
           model.model_name.toLowerCase().includes('c4ai-') ||
           model.model_name.toLowerCase().includes('embed-'),
@@ -253,7 +255,7 @@ export const getModelCategories = (() => {
       mistral: {
         label: 'Mistral AI',
         icon: <Mistral.Color />,
-        filter: (model) => 
+        filter: (model) =>
           model.model_name.toLowerCase().includes('mistral') ||
           model.model_name.toLowerCase().includes('codestral') ||
           model.model_name.toLowerCase().includes('pixtral') ||
@@ -297,6 +299,7 @@ export function getChannelIcon(channelType) {
 
   switch (channelType) {
     case 1: // OpenAI
+    case 57: // OpenAI Responses
     case 3: // Azure OpenAI
       return <OpenAI size={iconSize} />;
     case 2: // Midjourney Proxy
@@ -711,7 +714,7 @@ const measureTextWidth = (
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
-  containerWidth,
+  containerWidth
 ) => {
   const span = document.createElement('span');
 
@@ -733,7 +736,7 @@ const measureTextWidth = (
 
 export function truncateText(text, maxWidth = 200) {
   const isMobileScreen = window.matchMedia(
-    `(max-width: ${MOBILE_BREAKPOINT - 1}px)`,
+    `(max-width: ${MOBILE_BREAKPOINT - 1}px)`
   ).matches;
   if (!isMobileScreen) {
     return text;
@@ -773,7 +776,7 @@ export function truncateText(text, maxWidth = 200) {
   } catch (error) {
     console.warn(
       'Text measurement failed, falling back to character count',
-      error,
+      error
     );
     if (text.length > 20) {
       return text.slice(0, 17) + '...';
@@ -1082,7 +1085,7 @@ function renderPriceSimpleCore({
 }) {
   const { ratio: effectiveGroupRatio, label: ratioLabel } = getEffectiveRatio(
     groupRatio,
-    user_group_ratio,
+    user_group_ratio
   );
   const finalGroupRatio = effectiveGroupRatio;
 
@@ -1119,8 +1122,8 @@ function renderPriceSimpleCore({
     if (shouldShowCacheCreation5m && shouldShowCacheCreation1h) {
       parts.push(
         i18next.t(
-          '缓存创建: 5m {{cacheCreationRatio5m}} / 1h {{cacheCreationRatio1h}}',
-        ),
+          '缓存创建: 5m {{cacheCreationRatio5m}} / 1h {{cacheCreationRatio1h}}'
+        )
       );
     } else if (shouldShowCacheCreation5m) {
       parts.push(i18next.t('缓存创建: 5m {{cacheCreationRatio5m}}'));
@@ -1179,11 +1182,11 @@ export function renderModelPrice(
   audioInputTokens = 0,
   audioInputPrice = 0,
   imageGenerationCall = false,
-  imageGenerationCallPrice = 0,
+  imageGenerationCallPrice = 0
 ) {
   const { ratio: effectiveGroupRatio, label: ratioLabel } = getEffectiveRatio(
     groupRatio,
-    user_group_ratio,
+    user_group_ratio
   );
   groupRatio = effectiveGroupRatio;
 
@@ -1201,7 +1204,7 @@ export function renderModelPrice(
         ratio: groupRatio,
         total: displayTotal,
         ratioType: ratioLabel,
-      },
+      }
     );
   } else {
     if (completionRatio === undefined) {
@@ -1241,9 +1244,11 @@ export function renderModelPrice(
                 symbol: symbol,
                 price: (inputRatioPrice * rate).toFixed(6),
                 audioPrice: audioInputSeperatePrice
-                  ? `，音频 ${symbol}${(audioInputPrice * rate).toFixed(6)} / 1M tokens`
+                  ? `，音频 ${symbol}${(audioInputPrice * rate).toFixed(
+                      6
+                    )} / 1M tokens`
                   : '',
-              },
+              }
             )}
           </p>
           <p>
@@ -1254,7 +1259,7 @@ export function renderModelPrice(
                 price: (inputRatioPrice * rate).toFixed(6),
                 total: (completionRatioPrice * rate).toFixed(6),
                 completionRatio: completionRatio,
-              },
+              }
             )}
           </p>
           {cacheTokens > 0 && (
@@ -1266,7 +1271,7 @@ export function renderModelPrice(
                   price: (inputRatioPrice * rate).toFixed(6),
                   total: (inputRatioPrice * cacheRatio * rate).toFixed(6),
                   cacheRatio: cacheRatio,
-                },
+                }
               )}
             </p>
           )}
@@ -1280,7 +1285,7 @@ export function renderModelPrice(
                   ratio: groupRatio,
                   total: (imageRatioPrice * groupRatio * rate).toFixed(6),
                   imageRatio: imageRatio,
-                },
+                }
               )}
             </p>
           )}
@@ -1321,7 +1326,7 @@ export function renderModelPrice(
                     imageRatio: imageRatio,
                     symbol: symbol,
                     price: (inputRatioPrice * rate).toFixed(6),
-                  },
+                  }
                 );
               } else if (cacheTokens > 0) {
                 inputDesc = i18next.t(
@@ -1332,7 +1337,7 @@ export function renderModelPrice(
                     symbol: symbol,
                     price: (inputRatioPrice * rate).toFixed(6),
                     cachePrice: (cacheRatioPrice * rate).toFixed(6),
-                  },
+                  }
                 );
               } else if (audioInputSeperatePrice && audioInputTokens > 0) {
                 inputDesc = i18next.t(
@@ -1343,7 +1348,7 @@ export function renderModelPrice(
                     symbol: symbol,
                     price: (inputRatioPrice * rate).toFixed(6),
                     audioPrice: (audioInputPrice * rate).toFixed(6),
-                  },
+                  }
                 );
               } else {
                 inputDesc = i18next.t(
@@ -1352,7 +1357,7 @@ export function renderModelPrice(
                     input: inputTokens,
                     symbol: symbol,
                     price: (inputRatioPrice * rate).toFixed(6),
-                  },
+                  }
                 );
               }
 
@@ -1365,7 +1370,7 @@ export function renderModelPrice(
                   compPrice: (completionRatioPrice * rate).toFixed(6),
                   ratio: groupRatio,
                   ratioType: ratioLabel,
-                },
+                }
               );
 
               // 构建额外服务描述
@@ -1379,7 +1384,7 @@ export function renderModelPrice(
                         price: (webSearchPrice * rate).toFixed(6),
                         ratio: groupRatio,
                         ratioType: ratioLabel,
-                      },
+                      }
                     )
                   : '',
                 fileSearch && fileSearchCallCount > 0
@@ -1391,7 +1396,7 @@ export function renderModelPrice(
                         price: (fileSearchPrice * rate).toFixed(6),
                         ratio: groupRatio,
                         ratioType: ratioLabel,
-                      },
+                      }
                     )
                   : '',
                 imageGenerationCall && imageGenerationCallPrice > 0
@@ -1402,7 +1407,7 @@ export function renderModelPrice(
                         price: (imageGenerationCallPrice * rate).toFixed(6),
                         ratio: groupRatio,
                         ratioType: ratioLabel,
-                      },
+                      }
                     )
                   : '',
               ].join('');
@@ -1415,7 +1420,7 @@ export function renderModelPrice(
                   extraServices,
                   symbol: symbol,
                   total: (price * rate).toFixed(6),
-                },
+                }
               );
             })()}
           </p>
@@ -1438,7 +1443,7 @@ export function renderLogContent(
   webSearch = false,
   webSearchCallCount = 0,
   fileSearch = false,
-  fileSearchCallCount = 0,
+  fileSearchCallCount = 0
 ) {
   const {
     ratio,
@@ -1467,7 +1472,7 @@ export function renderLogContent(
           imageRatio: imageRatio,
           ratioType: ratioLabel,
           ratio,
-        },
+        }
       );
     } else if (webSearch) {
       return i18next.t(
@@ -1479,7 +1484,7 @@ export function renderLogContent(
           ratioType: ratioLabel,
           ratio,
           webSearchCallCount,
-        },
+        }
       );
     } else {
       return i18next.t(
@@ -1490,7 +1495,7 @@ export function renderLogContent(
           completionRatio: completionRatio,
           ratioType: ratioLabel,
           ratio,
-        },
+        }
       );
     }
   }
@@ -1512,7 +1517,7 @@ export function renderModelPriceSimple(
   image = false,
   imageRatio = 1.0,
   isSystemPromptOverride = false,
-  provider = 'openai',
+  provider = 'openai'
 ) {
   return renderPriceSimpleCore({
     modelRatio,
@@ -1546,11 +1551,11 @@ export function renderAudioModelPrice(
   groupRatio,
   user_group_ratio,
   cacheTokens = 0,
-  cacheRatio = 1.0,
+  cacheRatio = 1.0
 ) {
   const { ratio: effectiveGroupRatio, label: ratioLabel } = getEffectiveRatio(
     groupRatio,
-    user_group_ratio,
+    user_group_ratio
   );
   groupRatio = effectiveGroupRatio;
 
@@ -1567,7 +1572,7 @@ export function renderAudioModelPrice(
         ratio: groupRatio,
         total: (modelPrice * groupRatio * rate).toFixed(6),
         ratioType: ratioLabel,
-      },
+      }
     );
   } else {
     if (completionRatio === undefined) {
@@ -1613,7 +1618,7 @@ export function renderAudioModelPrice(
                 price: (inputRatioPrice * rate).toFixed(6),
                 total: (completionRatioPrice * rate).toFixed(6),
                 completionRatio: completionRatio,
-              },
+              }
             )}
           </p>
           {cacheTokens > 0 && (
@@ -1625,7 +1630,7 @@ export function renderAudioModelPrice(
                   price: (inputRatioPrice * rate).toFixed(6),
                   total: (inputRatioPrice * cacheRatio * rate).toFixed(6),
                   cacheRatio: cacheRatio,
-                },
+                }
               )}
             </p>
           )}
@@ -1637,7 +1642,7 @@ export function renderAudioModelPrice(
                 price: (inputRatioPrice * rate).toFixed(6),
                 total: (inputRatioPrice * audioRatio * rate).toFixed(6),
                 audioRatio: audioRatio,
-              },
+              }
             )}
           </p>
           <p>
@@ -1654,7 +1659,7 @@ export function renderAudioModelPrice(
                 ).toFixed(6),
                 audioRatio: audioRatio,
                 audioCompRatio: audioCompletionRatio,
-              },
+              }
             )}
           </p>
           <p>
@@ -1666,13 +1671,13 @@ export function renderAudioModelPrice(
                     cacheInput: cacheTokens,
                     symbol: symbol,
                     cachePrice: (inputRatioPrice * cacheRatio * rate).toFixed(
-                      6,
+                      6
                     ),
                     price: (inputRatioPrice * rate).toFixed(6),
                     completion: completionTokens,
                     compPrice: (completionRatioPrice * rate).toFixed(6),
                     total: (textPrice * rate).toFixed(6),
-                  },
+                  }
                 )
               : i18next.t(
                   '文字提示 {{input}} tokens / 1M tokens * {{symbol}}{{price}} + 文字补全 {{completion}} tokens / 1M tokens * {{symbol}}{{compPrice}} = {{symbol}}{{total}}',
@@ -1683,7 +1688,7 @@ export function renderAudioModelPrice(
                     completion: completionTokens,
                     compPrice: (completionRatioPrice * rate).toFixed(6),
                     total: (textPrice * rate).toFixed(6),
-                  },
+                  }
                 )}
           </p>
           <p>
@@ -1694,7 +1699,7 @@ export function renderAudioModelPrice(
                 completion: audioCompletionTokens,
                 symbol: symbol,
                 audioInputPrice: (audioRatio * inputRatioPrice * rate).toFixed(
-                  6,
+                  6
                 ),
                 audioCompPrice: (
                   audioRatio *
@@ -1703,7 +1708,7 @@ export function renderAudioModelPrice(
                   rate
                 ).toFixed(6),
                 total: (audioPrice * rate).toFixed(6),
-              },
+              }
             )}
           </p>
           <p>
@@ -1714,7 +1719,7 @@ export function renderAudioModelPrice(
                 total: (price * rate).toFixed(6),
                 textPrice: (textPrice * rate).toFixed(6),
                 audioPrice: (audioPrice * rate).toFixed(6),
-              },
+              }
             )}
           </p>
           <p>{i18next.t('仅供参考，以实际扣费为准')}</p>
@@ -1747,11 +1752,11 @@ export function renderClaudeModelPrice(
   cacheCreationTokens5m = 0,
   cacheCreationRatio5m = 1.0,
   cacheCreationTokens1h = 0,
-  cacheCreationRatio1h = 1.0,
+  cacheCreationRatio1h = 1.0
 ) {
   const { ratio: effectiveGroupRatio, label: ratioLabel } = getEffectiveRatio(
     groupRatio,
-    user_group_ratio,
+    user_group_ratio
   );
   groupRatio = effectiveGroupRatio;
 
@@ -1767,7 +1772,7 @@ export function renderClaudeModelPrice(
         ratioType: ratioLabel,
         ratio: groupRatio,
         total: (modelPrice * groupRatio * rate).toFixed(6),
-      },
+      }
     );
   } else {
     if (completionRatio === undefined) {
@@ -1835,8 +1840,8 @@ export function renderClaudeModelPrice(
             symbol,
             price: cacheUnitPrice.toFixed(6),
             ratio: cacheRatio,
-          },
-        ),
+          }
+        )
       );
     }
 
@@ -1849,8 +1854,8 @@ export function renderClaudeModelPrice(
             symbol,
             price: cacheCreationUnitPrice.toFixed(6),
             ratio: cacheCreationRatio,
-          },
-        ),
+          }
+        )
       );
     }
 
@@ -1863,8 +1868,8 @@ export function renderClaudeModelPrice(
             symbol,
             price: cacheCreationUnitPrice5m.toFixed(6),
             ratio: cacheCreationRatio5m,
-          },
-        ),
+          }
+        )
       );
     }
 
@@ -1877,8 +1882,8 @@ export function renderClaudeModelPrice(
             symbol,
             price: cacheCreationUnitPrice1h.toFixed(6),
             ratio: cacheCreationRatio1h,
-          },
-        ),
+          }
+        )
       );
     }
 
@@ -1889,8 +1894,8 @@ export function renderClaudeModelPrice(
           completion: completionTokens,
           symbol,
           price: completionUnitPrice.toFixed(6),
-        },
-      ),
+        }
+      )
     );
 
     const breakdownText = breakdownSegments.join(' + ');
@@ -1912,7 +1917,7 @@ export function renderClaudeModelPrice(
                 price: (inputRatioPrice * rate).toFixed(6),
                 ratio: completionRatio,
                 total: (completionRatioPrice * rate).toFixed(6),
-              },
+              }
             )}
           </p>
           {shouldShowCache && (
@@ -1925,7 +1930,7 @@ export function renderClaudeModelPrice(
                   ratio: cacheRatio,
                   total: cacheUnitPrice.toFixed(6),
                   cacheRatio: cacheRatio,
-                },
+                }
               )}
             </p>
           )}
@@ -1939,7 +1944,7 @@ export function renderClaudeModelPrice(
                   ratio: cacheCreationRatio,
                   total: cacheCreationUnitPrice.toFixed(6),
                   cacheCreationRatio: cacheCreationRatio,
-                },
+                }
               )}
             </p>
           )}
@@ -1953,7 +1958,7 @@ export function renderClaudeModelPrice(
                   ratio: cacheCreationRatio5m,
                   total: cacheCreationUnitPrice5m.toFixed(6),
                   cacheCreationRatio5m: cacheCreationRatio5m,
-                },
+                }
               )}
             </p>
           )}
@@ -1967,7 +1972,7 @@ export function renderClaudeModelPrice(
                   ratio: cacheCreationRatio1h,
                   total: cacheCreationUnitPrice1h.toFixed(6),
                   cacheCreationRatio1h: cacheCreationRatio1h,
-                },
+                }
               )}
             </p>
           )}
@@ -1980,7 +1985,7 @@ export function renderClaudeModelPrice(
                   five: cacheCreationUnitPrice5m.toFixed(6),
                   one: cacheCreationUnitPrice1h.toFixed(6),
                   total: cacheCreationUnitPriceTotal.toFixed(6),
-                },
+                }
               )}
             </p>
           )}
@@ -1994,7 +1999,7 @@ export function renderClaudeModelPrice(
                 ratio: groupRatio,
                 symbol: symbol,
                 total: (price * rate).toFixed(6),
-              },
+              }
             )}
           </p>
           <p>{i18next.t('仅供参考，以实际扣费为准')}</p>
@@ -2015,11 +2020,11 @@ export function renderClaudeLogContent(
   cacheCreationTokens5m = 0,
   cacheCreationRatio5m = 1.0,
   cacheCreationTokens1h = 0,
-  cacheCreationRatio1h = 1.0,
+  cacheCreationRatio1h = 1.0
 ) {
   const { ratio: effectiveGroupRatio, label: ratioLabel } = getEffectiveRatio(
     groupRatio,
-    user_group_ratio,
+    user_group_ratio
   );
   groupRatio = effectiveGroupRatio;
 
@@ -2049,21 +2054,21 @@ export function renderClaudeLogContent(
           {
             cacheCreationRatio5m,
             cacheCreationRatio1h,
-          },
+          }
         );
       } else if (shouldShowCacheCreation5m) {
         cacheCreationPart = i18next.t(
           '缓存创建倍率 5m {{cacheCreationRatio5m}}',
           {
             cacheCreationRatio5m,
-          },
+          }
         );
       } else if (shouldShowCacheCreation1h) {
         cacheCreationPart = i18next.t(
           '缓存创建倍率 1h {{cacheCreationRatio1h}}',
           {
             cacheCreationRatio1h,
-          },
+          }
         );
       }
     }
@@ -2104,7 +2109,7 @@ export function rehypeSplitWordsIntoSpans(options = {}) {
     visit(tree, 'element', (node) => {
       if (
         ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'strong'].includes(
-          node.tagName,
+          node.tagName
         ) &&
         node.children
       ) {

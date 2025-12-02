@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/relay/channel"
+	"github.com/QuantumNous/new-api/relay/channel/openai_responses"
 	"github.com/QuantumNous/new-api/relay/channel/ali"
 	"github.com/QuantumNous/new-api/relay/channel/aws"
 	"github.com/QuantumNous/new-api/relay/channel/baidu"
@@ -61,6 +62,8 @@ func GetAdaptor(apiType int) channel.Adaptor {
 		return &gemini.Adaptor{}
 	case constant.APITypeOpenAI:
 		return &openai.Adaptor{}
+	case constant.APITypeOpenAIResponses:
+		return &openai_responses.Adaptor{}
 	case constant.APITypePaLM:
 		return &palm.Adaptor{}
 	case constant.APITypeTencent:
