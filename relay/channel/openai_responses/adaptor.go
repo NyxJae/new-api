@@ -73,20 +73,45 @@ func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayIn
 	return nil, fmt.Errorf("OpenAI Responses 渠道不支持 Gemini 请求")
 }
 
-// ConvertOpenAIRequest OpenAI 通用请求转换（不支持）
-// 该渠道仅支持 Responses API，不支持通用 OpenAI 请求
+// ConvertOpenAIRequest OpenAI 通用请求转换
+// 支持智能路由：自动检测并转换 Chat Completions 请求到 Responses API 格式
 // 参数:
 //   - request: OpenAI 通用请求对象
 // 返回:
-//   - error: 如果不是 Responses API 请求则返回错误
+//   - any: 转换后的请求对象
+//   - error: 转换失败时返回错误
 func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeneralOpenAIRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	if info.RelayMode != relayconstant.RelayModeResponses {
-		return nil, fmt.Errorf("OpenAI Responses 渠道仅支持 Responses API 请求")
+
+	// 智能路由检测：如果是 Chat Completions 请求，自动转换为 Responses API 格式
+	if info.RelayMode == relayconstant.RelayModeChatCompletions {
+		// 标记这是一个转换后的请求，用于响应处理阶段
+		c.Set("converted_from_chat", true)
+		
+		// 保存原始请求，用于响应转换时参考
+		c.Set("original_chat_request", request)
+		
+		// 调用转换器进行格式转换
+		responsesReq, err := ChatCompletionsToResponsesRequest(c, request, info)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert chat completions request: %w", err)
+		}
+		
+		// 更新 RelayMode 为 Responses 模式
+		info.RelayMode = relayconstant.RelayModeResponses
+		
+		return responsesReq, nil
 	}
-	return request, nil
+
+	// 如果是 Responses API 请求，直接返回
+	if info.RelayMode == relayconstant.RelayModeResponses {
+		return request, nil
+	}
+
+	// 不支持的请求模式
+	return nil, fmt.Errorf("OpenAI Responses 渠道仅支持 Chat Completions 和 Responses API 请求")
 }
 
 // ConvertOpenAIResponsesRequest Responses API 请求转换
@@ -150,7 +175,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 }
 
 // DoResponse 处理 HTTP 响应
-// 根据流式或非流式模式处理响应数据
+// 根据流式或非流式模式处理响应数据，支持智能响应转换
 // 参数:
 //   - c: Gin 上下文
 //   - resp: HTTP 响应对象
@@ -159,12 +184,30 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 //   - usage: 使用量统计信息
 //   - err: 处理失败时返回错误
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (usage any, err *types.NewAPIError) {
+	// 检查是否是从 Chat Completions 转换来的请求
+	convertedFromChat, _ := c.Get("converted_from_chat")
+	isConvertedFromChat := convertedFromChat == true
+
+	// 如果是转换后的请求，需要将响应转换回 Chat Completions 格式
+	if isConvertedFromChat {
+		if info.IsStream {
+			// 流式响应转换：调用专用的转换处理器
+			usage, err = ResponsesToChatStreamHandler(c, info, resp)
+		} else {
+			// 非流式响应转换：调用专用的转换处理器
+			usage, err = ResponsesToChatHandler(c, info, resp)
+		}
+		return
+	}
+
+	// 原生 Responses API 请求，直接处理
 	if info.RelayMode != relayconstant.RelayModeResponses {
 		return nil, types.NewError(
 			fmt.Errorf("OpenAI Responses 渠道仅支持 /v1/responses 接口"),
 			types.ErrorCodeBadResponse,
 		)
 	}
+	
 	if info.IsStream {
 		usage, err = openai.OaiResponsesStreamHandler(c, info, resp)
 	} else {
