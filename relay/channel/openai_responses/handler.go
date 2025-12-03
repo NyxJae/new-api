@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -19,7 +20,6 @@ import (
 )
 
 // ResponsesToChatHandler 处理从 Responses API 到 Chat Completions 的响应转换
-// 用于智能路由场景：当 Chat Completions 请求被路由到 Responses 渠道时
 func ResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	defer service.CloseResponseBodyGracefully(resp)
 
@@ -39,6 +39,10 @@ func ResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
+	}
+// 检查并清理响应体中的无效UTF-8字符
+	if !utf8.Valid(responseBody) {
+		responseBody = []byte(strings.ToValidUTF8(string(responseBody), ""))
 	}
 
 	// 将响应体存储到 relayInfo 中
@@ -61,10 +65,15 @@ func ResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 		return nil, types.NewError(err, types.ErrorCodeBadResponse)
 	}
 
-// 序列化 Chat Completions 响应
+	// 序列化 Chat Completions 响应
 	jsonData, err := json.Marshal(chatResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeJsonMarshalFailed, http.StatusInternalServerError)
+	}
+
+	// 验证并清理生成的JSON中的无效UTF-8字符
+	if !isValidUTF8Bytes(jsonData) {
+		jsonData = cleanInvalidUTF8Bytes(jsonData)
 	}
 
 	// 写入转换后的响应体
@@ -109,18 +118,16 @@ func ResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, r
 	var usage = &dto.Usage{}
 	var responseTextBuilder strings.Builder
 
-	// 用于收集完整的流式响应体
+// 用于收集完整的流式响应体
 	var fullStreamResponse strings.Builder
 
 	// 获取响应ID，用于流式响应
 	var responseID string
 
 	helper.StreamScannerHandler(c, resp, info, func(data string) bool {
-		// 累积完整响应体用于日志记录
-		if len(data) > 0 {
-			fullStreamResponse.WriteString(data)
-			fullStreamResponse.WriteString("\n")
-		}
+		// 收集流式响应数据
+		fullStreamResponse.WriteString(data)
+		fullStreamResponse.WriteString("\n")
 
 		// 解析 Responses API 流式响应
 		var streamResponse dto.ResponsesStreamResponse
@@ -139,7 +146,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, r
 
 			// 处理使用量统计
 			switch streamResponse.Type {
-			case "response.completed":
+			case "response.done":
 				if streamResponse.Response != nil {
 					if streamResponse.Response.Usage != nil {
 						if streamResponse.Response.Usage.InputTokens != 0 {
@@ -205,6 +212,11 @@ func sendChatStreamData(c *gin.Context, response dto.ChatCompletionsStreamRespon
 	if err != nil {
 		logger.LogError(c, fmt.Sprintf("Failed to marshal chat stream response: %v", err))
 		return
+	}
+
+	// 验证并清理流式JSON数据中的无效UTF-8字符
+	if !isValidUTF8Bytes(jsonData) {
+		jsonData = cleanInvalidUTF8Bytes(jsonData)
 	}
 
 	// 构建 SSE 格式

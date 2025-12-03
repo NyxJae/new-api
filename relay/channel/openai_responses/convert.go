@@ -3,11 +3,60 @@ package openai_responses
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 )
+
+// isValidUTF8String 检查字符串是否包含有效的UTF-8字符
+func isValidUTF8String(s string) bool {
+	for _, r := range s {
+		if !utf8.ValidRune(r) {
+			return false
+		}
+		// 检查控制字符（除了常见的空白字符）
+		if unicode.IsControl(r) && !strings.ContainsRune("\r\n\t", r) {
+			return false
+		}
+	}
+	return utf8.ValidString(s)
+}
+
+// isValidUTF8Bytes 检查字节切片是否包含有效的UTF-8字符
+func isValidUTF8Bytes(b []byte) bool {
+	return utf8.Valid(b)
+}
+
+// cleanInvalidUTF8Chars 清理字符串中的无效UTF-8字符
+func cleanInvalidUTF8Chars(s string) string {
+	var result strings.Builder
+	
+	for _, r := range s {
+		// 跳过无效的UTF-8字符
+		if !utf8.ValidRune(r) {
+			continue
+		}
+		
+		// 跳过控制字符（除了常见的空白字符）
+		if unicode.IsControl(r) && !strings.ContainsRune("\r\n\t", r) {
+			continue
+		}
+		
+		result.WriteRune(r)
+	}
+	
+	return result.String()
+}
+
+// cleanInvalidUTF8Bytes 清理字节切片中的无效UTF-8字符
+func cleanInvalidUTF8Bytes(b []byte) []byte {
+	// 将字节切片转换为字符串，清理后再转回字节切片
+	return []byte(strings.ToValidUTF8(string(b), ""))
+}
 
 // ChatCompletionsToResponsesRequest 将Chat Completions请求转换为Responses API格式
 // 参数:
@@ -54,7 +103,24 @@ func ChatCompletionsToResponsesRequest(c *gin.Context, chatRequest *dto.GeneralO
 	// 提取系统消息并设置为instructions
 	systemMessage := extractSystemMessage(chatRequest.Messages)
 	if systemMessage != "" {
-		instructions := json.RawMessage([]byte(systemMessage))
+		// 确保systemMessage被正确JSON编码
+		// 如果systemMessage已经是JSON字符串，直接使用
+		// 如果是普通字符串，需要先编码为JSON字符串
+		var instructions json.RawMessage
+		
+		// 尝试解析systemMessage，检查是否已经是有效的JSON
+		var testValue interface{}
+		if err := json.Unmarshal([]byte(systemMessage), &testValue); err == nil {
+			// systemMessage已经是有效的JSON，直接使用
+			instructions = json.RawMessage([]byte(systemMessage))
+		} else {
+			// systemMessage是普通字符串，需要编码为JSON字符串
+			encodedBytes, err := json.Marshal(systemMessage)
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode system message: %w", err)
+			}
+			instructions = json.RawMessage(encodedBytes)
+		}
 		responsesReq.Instructions = instructions
 	}
 
@@ -145,32 +211,46 @@ func convertMessagesToInputs(messages []dto.Message) ([]dto.Input, error) {
 		}
 		
 		input := dto.Input{
-			Type:    "input",
+			Type:    "message",
 			Role:    message.Role,
 		}
 		
 		// 处理content字段
 		if message.Content != nil {
-			// 如果content是字符串，直接使用
+			// 验证content是否包含无效字符
+			var contentBytes []byte
+			var err error
+			
+			// 如果content是字符串，验证编码并使用
 			if str, ok := message.Content.(string); ok {
-				contentBytes, err := json.Marshal(str)
+				// 检查字符串是否包含无效的UTF-8字符
+				if !isValidUTF8String(str) {
+					// 清理无效字符
+					str = cleanInvalidUTF8Chars(str)
+				}
+				contentBytes, err = json.Marshal(str)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal string content: %w", err)
 				}
-				input.Content = json.RawMessage(contentBytes)
 			} else {
-				// 如果content是复杂类型，直接序列化
-				contentBytes, err := json.Marshal(message.Content)
+				// 如果content是复杂类型，先验证再序列化
+				// 使用json.Marshal然后验证结果
+				contentBytes, err = json.Marshal(message.Content)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal complex content: %w", err)
 				}
-				input.Content = json.RawMessage(contentBytes)
+				
+				// 验证生成的JSON是否有效
+				if !isValidUTF8Bytes(contentBytes) {
+					return nil, fmt.Errorf("generated JSON contains invalid UTF-8 characters")
+				}
 			}
+			input.Content = json.RawMessage(contentBytes)
 		}
 		
 		inputs = append(inputs, input)
 	}
-return inputs, nil
+	return inputs, nil
 }
 
 // ResponsesToChatCompletionsResponse 将Responses API响应转换为Chat Completions格式
@@ -240,7 +320,7 @@ func extractContentFromOutput(output []dto.ResponsesOutput) string {
 	for _, item := range output {
 		if item.Type == "message" && item.Role == "assistant" {
 			for _, contentItem := range item.Content {
-				if contentItem.Type == "text" {
+				if contentItem.Type == "output_text" {
 					contentBuilder += contentItem.Text
 				}
 			}
@@ -302,7 +382,7 @@ func ConvertResponsesStreamToChatStream(responsesStreamResp *dto.ResponsesStream
 
 	// 根据不同的事件类型进行处理
 	switch responsesStreamResp.Type {
-	case "response.content_part.delta":
+	case "response.output_text.delta":
 		// 内容增量事件
 		if responsesStreamResp.Delta != "" {
 			content := responsesStreamResp.Delta
