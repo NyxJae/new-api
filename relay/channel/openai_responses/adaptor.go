@@ -57,12 +57,39 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *
 	return nil
 }
 
-// ConvertClaudeRequest Claude 请求转换（不支持）
-// 该渠道不支持 Claude 格式的请求
+// ConvertClaudeRequest Claude 请求转换
+// 支持 Claude Messages API 格式转换为 Responses API 格式
+// 参数:
+//   - c: Gin 上下文
+//   - info: 转发信息
+//   - request: Claude Messages API 请求对象
 // 返回:
-//   - error: 始终返回不支持的错误
+//   - any: 转换后的 Responses API 请求对象
+//   - error: 转换失败时返回错误
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ClaudeRequest) (any, error) {
-	return nil, fmt.Errorf("OpenAI Responses 渠道不支持 Claude 请求")
+	if request == nil {
+		return nil, fmt.Errorf("claude request is nil")
+	}
+	if request.Model == "" {
+		return nil, fmt.Errorf("model is required")
+	}
+
+	// 标记这是一个转换后的请求，用于响应处理阶段
+	c.Set("converted_from_claude", true)
+	
+	// 保存原始请求，用于响应转换时参考
+	c.Set("original_claude_request", request)
+	
+	// 调用转换器进行格式转换
+	responsesReq, err := ClaudeMessagesToResponsesRequest(c, request, info)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert claude messages request: %w", err)
+	}
+	
+	// 更新 RelayMode 为 Responses 模式
+	info.RelayMode = relayconstant.RelayModeResponses
+	
+	return responsesReq, nil
 }
 
 // ConvertGeminiRequest Gemini 请求转换（不支持）
@@ -188,7 +215,11 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	convertedFromChat, _ := c.Get("converted_from_chat")
 	isConvertedFromChat := convertedFromChat == true
 
-	// 如果是转换后的请求，需要将响应转换回 Chat Completions 格式
+	// 检查是否是从 Claude Messages 转换来的请求
+	convertedFromClaude, _ := c.Get("converted_from_claude")
+	isConvertedFromClaude := convertedFromClaude == true
+
+	// 如果是从 Chat Completions 转换来的请求，需要将响应转换回 Chat Completions 格式
 	if isConvertedFromChat {
 		if info.IsStream {
 			// 流式响应转换：调用专用的转换处理器
@@ -196,6 +227,18 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		} else {
 			// 非流式响应转换：调用专用的转换处理器
 			usage, err = ResponsesToChatHandler(c, info, resp)
+		}
+		return
+	}
+
+	// 如果是从 Claude Messages 转换来的请求，需要将响应转换回 Claude Messages 格式
+	if isConvertedFromClaude {
+		if info.IsStream {
+			// 流式响应转换：调用 Claude 专用的转换处理器
+			usage, err = ResponsesToClaudeStreamHandler(c, info, resp)
+		} else {
+			// 非流式响应转换：调用 Claude 专用的转换处理器
+			usage, err = ResponsesToClaudeHandler(c, info, resp)
 		}
 		return
 	}

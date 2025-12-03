@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -17,6 +19,43 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// isValidUTF8String 检查字符串是否为有效的UTF-8编码
+func isValidUTF8String(s string) bool {
+	return utf8.ValidString(s)
+}
+
+// isValidUTF8Bytes 检查字节切片是否为有效的UTF-8编码
+func isValidUTF8Bytes(b []byte) bool {
+	return utf8.Valid(b)
+}
+
+// cleanInvalidUTF8Chars 清理字符串中的无效UTF-8字符
+func cleanInvalidUTF8Chars(s string) string {
+	var result strings.Builder
+	
+	for _, r := range s {
+		// 跳过无效的UTF-8字符
+		if !utf8.ValidRune(r) {
+			continue
+		}
+		
+		// 跳过控制字符（除了常见的空白字符）
+		if unicode.IsControl(r) && !strings.ContainsRune("\r\n\t", r) {
+			continue
+		}
+		
+		result.WriteRune(r)
+	}
+	
+	return result.String()
+}
+
+// cleanInvalidUTF8Bytes 清理字节切片中的无效UTF-8字符
+func cleanInvalidUTF8Bytes(b []byte) []byte {
+	// 将字节切片转换为字符串，清理后再转回字节切片
+	return []byte(strings.ToValidUTF8(string(b), ""))
+}
 
 // ClaudeMessagesToResponsesRequest 将 Claude Messages 请求转换为 Responses API 格式
 // 参数:
@@ -130,11 +169,21 @@ func extractSystemMessageFromClaude(messages []dto.Message) string {
 		if message.Role == "system" {
 			// 处理不同类型的content
 			if str, ok := message.Content.(string); ok {
+				// 检查字符串是否包含无效的UTF-8字符
+				if !isValidUTF8String(str) {
+					// 清理无效字符
+					str = cleanInvalidUTF8Chars(str)
+				}
 				return str
 			}
 			
 			// 如果content是复杂类型，尝试转换为字符串
 			if contentBytes, err := json.Marshal(message.Content); err == nil {
+				// 验证生成的JSON是否有效
+				if !isValidUTF8Bytes(contentBytes) {
+					// 清理无效字符
+					contentBytes = cleanInvalidUTF8Bytes(contentBytes)
+				}
 				return string(contentBytes)
 			}
 		}
@@ -158,27 +207,41 @@ func convertClaudeMessagesToInputs(messages []dto.Message) ([]dto.Input, error) 
 		}
 		
 		input := dto.Input{
-			Type:    "input",
+			Type:    "message",
 			Role:    message.Role,
 		}
 		
 		// 处理content字段
 		if message.Content != nil {
-			// 如果content是字符串，直接使用
+			// 验证content是否包含无效字符
+			var contentBytes []byte
+			var err error
+			
+			// 如果content是字符串，验证编码并使用
 			if str, ok := message.Content.(string); ok {
-				contentBytes, err := json.Marshal(str)
+				// 检查字符串是否包含无效的UTF-8字符
+				if !isValidUTF8String(str) {
+					// 清理无效字符
+					str = cleanInvalidUTF8Chars(str)
+				}
+				contentBytes, err = json.Marshal(str)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal string content: %w", err)
 				}
-				input.Content = json.RawMessage(contentBytes)
 			} else {
-				// 如果content是复杂类型，直接序列化
-				contentBytes, err := json.Marshal(message.Content)
+				// 如果content是复杂类型，先验证再序列化
+				// 使用json.Marshal然后验证结果
+				contentBytes, err = json.Marshal(message.Content)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal complex content: %w", err)
 				}
-				input.Content = json.RawMessage(contentBytes)
+				
+				// 验证生成的JSON是否有效
+				if !isValidUTF8Bytes(contentBytes) {
+					return nil, fmt.Errorf("generated JSON contains invalid UTF-8 characters")
+				}
 			}
+			input.Content = json.RawMessage(contentBytes)
 		}
 		
 		inputs = append(inputs, input)
@@ -253,7 +316,7 @@ func extractContentFromOutput(output []dto.ResponsesOutput) string {
 	for _, item := range output {
 		if item.Type == "message" && item.Role == "assistant" {
 			for _, contentItem := range item.Content {
-				if contentItem.Type == "text" {
+				if contentItem.Type == "output_text" {
 					contentBuilder += contentItem.Text
 				}
 			}
@@ -332,24 +395,24 @@ if len(data) > 0 {
 				sendClaudeStreamData(c, claudeStreamResp)
 			}
 
-			// 处理使用量统计
-			switch streamResponse.Type {
-			case "response.completed":
-				if streamResponse.Response != nil && streamResponse.Response.Usage != nil {
-					if streamResponse.Response.Usage.InputTokens != 0 {
-						claudeInfo.Usage.PromptTokens = streamResponse.Response.Usage.InputTokens
-					}
-					if streamResponse.Response.Usage.OutputTokens != 0 {
-						claudeInfo.Usage.CompletionTokens = streamResponse.Response.Usage.OutputTokens
-					}
-					if streamResponse.Response.Usage.TotalTokens != 0 {
-						claudeInfo.Usage.TotalTokens = streamResponse.Response.Usage.TotalTokens
-					}
+		// 处理使用量统计
+		switch streamResponse.Type {
+		case "response.done":
+			if streamResponse.Response != nil && streamResponse.Response.Usage != nil {
+				if streamResponse.Response.Usage.InputTokens != 0 {
+					claudeInfo.Usage.PromptTokens = streamResponse.Response.Usage.InputTokens
 				}
-			case "response.output_text.delta":
-				// 处理输出文本用于备用token计算
-				claudeInfo.ResponseText.WriteString(streamResponse.Delta)
+				if streamResponse.Response.Usage.OutputTokens != 0 {
+					claudeInfo.Usage.CompletionTokens = streamResponse.Response.Usage.OutputTokens
+				}
+				if streamResponse.Response.Usage.TotalTokens != 0 {
+					claudeInfo.Usage.TotalTokens = streamResponse.Response.Usage.TotalTokens
+				}
 			}
+		case "response.output_text.delta":
+			// 处理输出文本用于备用token计算
+			claudeInfo.ResponseText.WriteString(streamResponse.Delta)
+		}
 		} else {
 			logger.LogError(c, "failed to unmarshal responses stream response: "+parseErr.Error())
 		}
@@ -395,6 +458,11 @@ func ResponsesToClaudeHandler(c *gin.Context, resp *http.Response, info *relayco
 		return nil, types.NewOpenAIError(readErr, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}
 
+	// 检查并清理响应体中的无效UTF-8字符
+	if !utf8.Valid(responseBody) {
+		responseBody = []byte(strings.ToValidUTF8(string(responseBody), ""))
+	}
+
 	// 将响应体存储到 relayInfo 中
 	info.ResponseBody = string(responseBody)
 
@@ -438,6 +506,11 @@ func ResponsesToClaudeHandler(c *gin.Context, resp *http.Response, info *relayco
 	jsonData, marshalErr := json.Marshal(claudeResponse)
 	if marshalErr != nil {
 		return nil, types.NewOpenAIError(marshalErr, types.ErrorCodeJsonMarshalFailed, http.StatusInternalServerError)
+	}
+
+	// 验证并清理生成的JSON中的无效UTF-8字符
+	if !isValidUTF8Bytes(jsonData) {
+		jsonData = cleanInvalidUTF8Bytes(jsonData)
 	}
 
 	// 写入转换后的响应体
